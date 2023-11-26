@@ -87,7 +87,8 @@ stages:
           displayName: 'Publish the project - $(buildConfiguration)'
           inputs:
             command: 'publish'
-            projects: '**/*.csproj'
+            #projects: '**/*.csproj'
+            projects: '$(System.DefaultWorkingDirectory)/**/Tailspin.SpaceGame.Web.csproj'
             publishWebProjects: false
             arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
             zipAfterPublish: true
@@ -95,3 +96,53 @@ stages:
         - task: PublishBuildArtifacts@1
           displayName: 'Publish Artifact: drop'
           condition: succeeded()
+
+  - stage: 'Deploy'
+    displayName: 'Deploy to App Service'
+    dependsOn: Build
+    jobs:
+    - deployment: Deploy
+      pool:
+        vmImage: 'ubuntu-latest'
+      environment: deploy
+      variables:
+      - group: Release
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - download: current
+              artifact: drop
+            - task: AzureWebApp@1
+              displayName: 'Azure App Service Deploy: website'
+              inputs:
+                azureSubscription: 'azure-sc'
+                appType: 'webAppLinux'
+                appName: '$(WebAppName)'
+                package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+
+    - job: RunUITests
+      dependsOn: Deploy
+      displayName: 'Run UI tests'
+      pool:
+        vmImage: 'windows-2019'
+      variables:
+      - group: 'Release'
+      steps: 
+      - task: UseDotNet@2
+        displayName: 'Use .NET SDK $(dotnetSdkVersion)'
+        inputs:
+          version: '$(dotnetSdkVersion)'
+      - task: DotNetCoreCLI@2
+        displayName: 'Build the project - $(buildConfiguration)'
+        inputs:
+          command: 'build'
+          arguments: '--configuration $(buildConfiguration)'
+          projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+      - task: DotNetCoreCLI@2
+        displayName: 'Run unit tests - $(buildConfiguration)'
+        inputs:
+          command: 'test'
+          arguments: '--no-build --configuration $(buildConfiguration)'
+          publishTestResults: true
+          projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
