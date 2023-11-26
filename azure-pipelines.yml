@@ -15,6 +15,8 @@ variables:
   buildConfiguration: 'Release'
   wwwrootDir: 'Tailspin.SpaceGame.Web/wwwroot'
   dotnetSdkVersion: '6.x'
+  bld.flavor: 'Release'
+  disable.coverage.autogenerate: 'true'
 
 stages:
   - stage: Build
@@ -22,11 +24,22 @@ stages:
     jobs:
       - job: Build
         steps:
+        - checkout: self
+          displayName: Checkout sources
+          submodules: recursive
+        
         - task: UseDotNet@2
           displayName: 'Use .NET SDK $(dotnetSdkVersion)'
           inputs:
             version: '$(dotnetSdkVersion)'
+            installationPath: $(Agent.ToolsDirectory)/dotnet
 
+        - task: Bash@3
+          displayName: Prepare Environment
+          inputs:
+            targetType: filePath
+            filePath: bld/linux/prep-env.sh
+            
         - task: Npm@1
           displayName: 'Run npm install'
           inputs:
@@ -38,7 +51,8 @@ stages:
         - task: gulp@1
           displayName: 'Run gulp tasks'
 
-        - script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
+        - script: |
+            echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt
           displayName: 'Write build info'
           workingDirectory: $(wwwrootDir)
 
@@ -52,7 +66,7 @@ stages:
           displayName: 'Build the project - $(buildConfiguration)'
           inputs:
             command: 'build'
-            arguments: '--no-restore --configuration $(buildConfiguration)'
+            arguments: '--no-restore -nowarn:CS7035 -c $(bld.flavor) -p:PackageVersion=$(bld.nuget_version) -p:FileVersion=$(bld.version) -p:AssemblyVersion=$(bld.asm_version) -p:InformationalVersion=$(bld.nuget_version)-$(Build.BuildNumber) -p:Version=$(bld.base_version) -p:IncludeSource=true'
             projects: '**/*.csproj'
 
         - task: DotNetCoreCLI@2
@@ -66,7 +80,7 @@ stages:
           displayName: 'Run unit tests - $(buildConfiguration)'
           inputs:
             command: 'test'
-            arguments: '--no-build --configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(Build.SourcesDirectory)/TestResults/Coverage/'
+            arguments: '--no-build --configuration $(buildConfiguration) -p:CollectCoverage=true -p:CoverletOutputFormat=cobertura -p:CoverletOutput=$(Build.SourcesDirectory)/TestResults/Coverage/'
             publishTestResults: true
             projects: '**/*.Tests.csproj'
         
@@ -89,9 +103,29 @@ stages:
             command: 'publish'
             projects: '**/*.csproj'
             publishWebProjects: false
-            arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
-            zipAfterPublish: true
+            zipAfterPublish: false
+            modifyOutputPath: false
+            #arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
+            arguments: '--no-build -c $(bld.flavor) -p:PublishDir=pubout'
 
-        - task: PublishBuildArtifacts@1
-          displayName: 'Publish Artifact: drop'
+        - task: ArchiveFiles@2
+          displayName: 'Create Zip file'
           condition: succeeded()
+          inputs:
+            rootFolderOrFile: '$(Build.SourcesDirectory)/Tailspin.SpaceGame.Web/pubout'
+            includeRootFolder: false
+            archiveType: 'zip'
+            archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+            replaceExistingArchive: true
+            verbose: false
+            quiet: false
+
+        # - task: PublishBuildArtifacts@1
+        #   displayName: 'Publish Artifact: drop'
+        #   condition: succeeded()
+
+
+
+
+
+

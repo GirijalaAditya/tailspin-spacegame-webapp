@@ -1,0 +1,3 @@
+[submodule "bld"]
+	path = bld
+	url = https://github.com/aditya2000learning/Build-Tools-Info.git
