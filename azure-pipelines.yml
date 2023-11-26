@@ -165,8 +165,11 @@ stages:
           arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
           zipAfterPublish: true
 
-      - publish: '$(Build.ArtifactStagingDirectory)'
-        artifact: drop
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          ArtifactName: 'drop'
+          publishLocation: 'Container'
 
   - stage: 'Deploy'
     displayName: 'Deploy to the dev environment'
@@ -182,8 +185,6 @@ stages:
         runOnce:
           deploy:
             steps:
-            - download: current
-              artifact: drop
             - task: AzureWebApp@1
               displayName: 'Azure App Service Deploy: website'
               inputs:
