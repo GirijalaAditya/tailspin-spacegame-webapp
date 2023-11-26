@@ -46,7 +46,10 @@ stages:
           displayName: 'Restore project dependencies'
           inputs:
             command: 'restore'
-            projects: '**/*.csproj'
+            projects: '**/*.sln'
+            feedsToUse: 'select'
+            #vstsFeed: '5d521605-d2e8-4b7b-9c60-55fdc675603e/54685395-4b1a-4266-8241-ad1eca08f3e3'
+            vstsFeed: '$(System.TeamProject)/Tailspin.SpaceGame.Web.Models'
 
         - task: DotNetCoreCLI@2
           displayName: 'Build the project - $(buildConfiguration)'
