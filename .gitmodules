@@ -1,0 +1,3 @@
+[submodule "bld"]
+	path = bld
+	url = https://adityaazuredevops@dev.azure.com/adityaazuredevops/Azure%20DevOps%20Projects/_git/BuildTools
